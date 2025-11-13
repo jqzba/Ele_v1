@@ -107,6 +107,16 @@ def hello_world(req: func.HttpRequest) -> func.HttpResponse:
             headers=CORS_HEADERS
         )
 
+@app.route(route="todo", methods=["OPTIONS"], auth_level=func.AuthLevel.ANONYMOUS)
+def todo_options(req: func.HttpRequest) -> func.HttpResponse:
+    """Handle CORS preflight requests"""
+    logging.info('OPTIONS /api/todo - CORS preflight request')
+    
+    return func.HttpResponse(
+        status_code=200,
+        headers=CORS_HEADERS
+    )
+
 @app.route(route="health", auth_level=func.AuthLevel.ANONYMOUS)
 def health_check(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Health check endpoint called.')
@@ -236,6 +246,16 @@ def create_todo(req: func.HttpRequest) -> func.HttpResponse:
             status_code=500,
             details=str(e)
         )
+
+@app.route(route="todo/{partitionKey}/{rowKey}", methods=["OPTIONS"], auth_level=func.AuthLevel.ANONYMOUS)
+def delete_options(req: func.HttpRequest) -> func.HttpResponse:
+    """Handle CORS preflight requests for DELETE"""
+    logging.info('OPTIONS /api/todo/{partitionKey}/{rowKey} - CORS preflight request for DELETE')
+    
+    return func.HttpResponse(
+        status_code=200,
+        headers=CORS_HEADERS
+    )
 
 @app.route(route="todo/{partitionKey}/{rowKey}", methods=["DELETE"], auth_level=func.AuthLevel.ANONYMOUS)
 def delete_todo(req: func.HttpRequest) -> func.HttpResponse:
