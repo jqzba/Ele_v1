@@ -1,49 +1,164 @@
-# Getting Started with Create React App
+# Serverless Todo Application
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A full-stack serverless todo application built with React frontend and Azure Functions Python backend, using Azure Table Storage for data persistence.
 
-## Available Scripts
+## Architecture
 
-In the project directory, you can run:
+- **Frontend**: React 19.2.0 with responsive UI
+- **Backend**: Python Azure Functions (serverless API)
+- **Storage**: Azure Table Storage for persistent data
+- **Infrastructure**: Azure (IaC with Bicep/Terraform - coming soon)
 
-### `npm start`
+## Features
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+✅ Add and remove todo items  
+✅ Display list of existing todos  
+✅ Persistent storage with Azure Table Storage  
+✅ RESTful API with error handling  
+✅ Responsive design  
+✅ CORS enabled for local development  
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Project Structure
 
-### `npm test`
+```
+Ele_v1/
+├── src/                      # React frontend
+│   ├── TodoApp.jsx          # Main todo component
+│   ├── TodoApp.css          # Component styles
+│   ├── App.js               # Root component
+│   └── App.css              # App styles
+├── todo_api/                # Azure Functions backend
+│   ├── function_app.py      # API endpoints
+│   ├── requirements.txt     # Python dependencies
+│   ├── host.json            # Function host config
+│   ├── local.settings.json.example  # Config template
+│   └── README.md            # Backend documentation
+└── README.md                # This file
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Prerequisites
 
-### `npm run build`
+- Node.js 14+ and npm
+- Python 3.9+
+- Azure Functions Core Tools v4+
+- Azure CLI (for deployment)
+- Azure Storage Account
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Local Development Setup
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### 1. Clone and Install Dependencies
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+```bash
+# Install frontend dependencies
+npm install
 
-### `npm run eject`
+# Install backend dependencies
+cd todo_api
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### 2. Configure Azure Storage
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+Create a storage account and get the connection string:
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+```bash
+# Login to Azure
+az login
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+# Get your storage account connection string
+az storage account show-connection-string \
+  --name YOUR_STORAGE_ACCOUNT \
+  --resource-group YOUR_RESOURCE_GROUP \
+  --output tsv
+```
+
+Copy `local.settings.json.example` to `local.settings.json` and add your connection string:
+
+```bash
+cd todo_api
+cp local.settings.json.example local.settings.json
+# Edit local.settings.json and add your AZURE_STORAGE_CONNECTION_STRING
+```
+
+See [todo_api/AZURE_STORAGE_SETUP.md](todo_api/AZURE_STORAGE_SETUP.md) for detailed storage setup instructions.
+
+### 3. Run the Application
+
+**Terminal 1 - Backend:**
+```bash
+cd todo_api
+func start
+```
+
+Backend will run on http://localhost:7071
+
+**Terminal 2 - Frontend:**
+```bash
+npm start
+```
+
+Frontend will run on http://localhost:3000
+
+## API Endpoints
+
+- `GET /api/hello` - Test endpoint
+- `GET /api/health` - Health check
+- `GET /api/todo` - Get all todos
+- `POST /api/todo` - Create a new todo (requires `{ "title": "..." }`)
+- `DELETE /api/todo/{partitionKey}/{rowKey}` - Delete a todo
+
+## Testing
+
+Test the backend API:
+
+```bash
+cd todo_api
+./test_azure_storage.sh
+```
+
+## Data Schema
+
+Todos are stored in Azure Table Storage with the following structure:
+
+```json
+{
+  "partitionKey": "default",
+  "rowKey": "1731491234567",
+  "id": "1731491234567",
+  "title": "Buy groceries",
+  "timestamp": "2025-11-13T10:00:00.000000Z"
+}
+```
+
+## Deployment
+
+> 🚧 Infrastructure as Code (Bicep/Terraform) and deployment instructions coming soon!
+
+## What's Implemented
+
+✅ **Backend API** - Azure Functions with GET, POST, DELETE endpoints  
+✅ **Frontend UI** - React form and list display  
+✅ **Data Persistence** - Azure Table Storage integration  
+✅ **Error Handling** - 400, 404, 500 responses  
+⏳ **Infrastructure as Code** - Coming next  
+⏳ **Frontend-Backend Integration** - Coming next  
+
+## Next Steps
+
+1. Connect React frontend to backend API
+2. Create Bicep/Terraform files for infrastructure
+3. Add Azure deployment configuration
+4. Deploy to Azure
 
 ## Learn More
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+- [Azure Functions Python](https://learn.microsoft.com/azure/azure-functions/functions-reference-python)
+- [Azure Table Storage](https://learn.microsoft.com/azure/storage/tables/table-storage-overview)
+- [Create React App](https://facebook.github.io/create-react-app/docs/getting-started)
+- [React Documentation](https://reactjs.org/)
 
-To learn React, check out the [React documentation](https://reactjs.org/).
 
 ### Code Splitting
 

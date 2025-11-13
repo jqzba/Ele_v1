@@ -1,0 +1,10 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "AzureWebJobsFeatureFlags": "EnableWorkerIndexing",
+    "AZURE_STORAGE_CONNECTION_STRING": "Get this from: az storage account show-connection-string --name YOUR_STORAGE_ACCOUNT --resource-group YOUR_RESOURCE_GROUP --output tsv",
+    "TABLE_NAME": "todos"
+  }
+}
