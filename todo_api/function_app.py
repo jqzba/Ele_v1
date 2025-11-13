@@ -7,7 +7,39 @@ from datetime import datetime
 from azure.data.tables import TableServiceClient, TableClient
 from azure.core.exceptions import ResourceNotFoundError, ResourceExistsError
 
+# Configure logging format
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
+
+# CORS headers for all responses
+CORS_HEADERS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Content-Type': 'application/json'
+}
+
+# Helper function to create error response
+def create_error_response(error_message, status_code=500, details=None):
+    """
+    Create a standardized error response
+    """
+    error_body = {"error": error_message}
+    if details:
+        error_body["details"] = details
+        logging.error(f'Error ({status_code}): {error_message} - {details}')
+    else:
+        logging.error(f'Error ({status_code}): {error_message}')
+    
+    return func.HttpResponse(
+        json.dumps(error_body),
+        status_code=status_code,
+        headers=CORS_HEADERS
+    )
 
 # Helper function to get table client
 def get_table_client():
@@ -63,7 +95,7 @@ def hello_world(req: func.HttpRequest) -> func.HttpResponse:
                 "status": "success"
             }),
             status_code=200,
-            headers={'Content-Type': 'application/json'}
+            headers=CORS_HEADERS
         )
     else:
         return func.HttpResponse(
@@ -72,7 +104,7 @@ def hello_world(req: func.HttpRequest) -> func.HttpResponse:
                 "status": "success"
             }),
             status_code=200,
-            headers={'Content-Type': 'application/json'}
+            headers=CORS_HEADERS
         )
 
 @app.route(route="health", auth_level=func.AuthLevel.ANONYMOUS)
@@ -85,7 +117,7 @@ def health_check(req: func.HttpRequest) -> func.HttpResponse:
             "message": "Todo API is running"
         }),
         status_code=200,
-        headers={'Content-Type': 'application/json'}
+        headers=CORS_HEADERS
     )
 
 @app.route(route="todo", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
@@ -97,12 +129,10 @@ def get_todos(req: func.HttpRequest) -> func.HttpResponse:
         table_client = get_table_client()
         
         if not table_client:
-            return func.HttpResponse(
-                json.dumps({
-                    "error": "Failed to connect to table storage"
-                }),
+            return create_error_response(
+                "Failed to connect to storage",
                 status_code=500,
-                headers={'Content-Type': 'application/json'}
+                details="Storage connection string not configured"
             )
         
         # Query all entities from the table
@@ -119,23 +149,19 @@ def get_todos(req: func.HttpRequest) -> func.HttpResponse:
             }
             todos.append(todo)
         
-        logging.info(f'Retrieved {len(todos)} todos')
+        logging.info(f'✅ Retrieved {len(todos)} todos successfully')
         
         return func.HttpResponse(
             json.dumps(todos),
             status_code=200,
-            headers={'Content-Type': 'application/json'}
+            headers=CORS_HEADERS
         )
     
     except Exception as e:
-        logging.error(f'Error retrieving todos: {str(e)}')
-        return func.HttpResponse(
-            json.dumps({
-                "error": "An error occurred while retrieving todos",
-                "details": str(e)
-            }),
+        return create_error_response(
+            "Failed to retrieve todos",
             status_code=500,
-            headers={'Content-Type': 'application/json'}
+            details=str(e)
         )
 
 @app.route(route="todo", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
@@ -145,24 +171,19 @@ def create_todo(req: func.HttpRequest) -> func.HttpResponse:
     try:
         # Parse request body
         req_body = req.get_json()
-    except ValueError:
-        return func.HttpResponse(
-            json.dumps({
-                "error": "Invalid JSON in request body"
-            }),
+    except ValueError as e:
+        return create_error_response(
+            "Invalid JSON in request body",
             status_code=400,
-            headers={'Content-Type': 'application/json'}
+            details=str(e)
         )
     
     # Validate that title field exists and is not empty
     title = req_body.get('title', '').strip()
     if not title:
-        return func.HttpResponse(
-            json.dumps({
-                "error": "Title is required and cannot be empty"
-            }),
-            status_code=400,
-            headers={'Content-Type': 'application/json'}
+        return create_error_response(
+            "Title is required and cannot be empty",
+            status_code=400
         )
     
     try:
@@ -170,12 +191,10 @@ def create_todo(req: func.HttpRequest) -> func.HttpResponse:
         table_client = get_table_client()
         
         if not table_client:
-            return func.HttpResponse(
-                json.dumps({
-                    "error": "Failed to connect to table storage"
-                }),
+            return create_error_response(
+                "Failed to connect to storage",
                 status_code=500,
-                headers={'Content-Type': 'application/json'}
+                details="Storage connection string not configured"
             )
         
         # Generate unique RowKey using timestamp
@@ -202,24 +221,20 @@ def create_todo(req: func.HttpRequest) -> func.HttpResponse:
             "rowKey": row_key
         }
         
-        logging.info(f'Created todo with RowKey: {row_key}')
+        logging.info(f'✅ Created todo: "{title}" with RowKey: {row_key}')
         
         # Return created todo with 201 status
         return func.HttpResponse(
             json.dumps(new_todo),
             status_code=201,
-            headers={'Content-Type': 'application/json'}
+            headers=CORS_HEADERS
         )
     
     except Exception as e:
-        logging.error(f'Error creating todo: {str(e)}')
-        return func.HttpResponse(
-            json.dumps({
-                "error": "An error occurred while creating the todo",
-                "details": str(e)
-            }),
+        return create_error_response(
+            "Failed to create todo",
             status_code=500,
-            headers={'Content-Type': 'application/json'}
+            details=str(e)
         )
 
 @app.route(route="todo/{partitionKey}/{rowKey}", methods=["DELETE"], auth_level=func.AuthLevel.ANONYMOUS)
@@ -231,18 +246,22 @@ def delete_todo(req: func.HttpRequest) -> func.HttpResponse:
         partition_key = req.route_params.get('partitionKey')
         row_key = req.route_params.get('rowKey')
         
+        if not partition_key or not row_key:
+            return create_error_response(
+                "Missing partitionKey or rowKey in URL",
+                status_code=400
+            )
+        
         logging.info(f'Attempting to delete todo with PartitionKey: {partition_key}, RowKey: {row_key}')
         
         # Get table client
         table_client = get_table_client()
         
         if not table_client:
-            return func.HttpResponse(
-                json.dumps({
-                    "error": "Failed to connect to table storage"
-                }),
+            return create_error_response(
+                "Failed to connect to storage",
                 status_code=500,
-                headers={'Content-Type': 'application/json'}
+                details="Storage connection string not configured"
             )
         
         # Try to get the entity first to check if it exists
@@ -252,7 +271,7 @@ def delete_todo(req: func.HttpRequest) -> func.HttpResponse:
             # Delete the entity
             table_client.delete_entity(partition_key=partition_key, row_key=row_key)
             
-            logging.info(f'Successfully deleted todo with RowKey: {row_key}')
+            logging.info(f'✅ Successfully deleted todo: "{entity.get("title", "")}" with RowKey: {row_key}')
             
             # Return success message with 200 status
             return func.HttpResponse(
@@ -267,26 +286,20 @@ def delete_todo(req: func.HttpRequest) -> func.HttpResponse:
                     }
                 }),
                 status_code=200,
-                headers={'Content-Type': 'application/json'}
+                headers=CORS_HEADERS
             )
         
         except ResourceNotFoundError:
-            logging.warning(f'Todo with PartitionKey: {partition_key}, RowKey: {row_key} not found')
-            return func.HttpResponse(
-                json.dumps({
-                    "error": "Todo item not found"
-                }),
+            logging.warning(f'⚠️  Todo with PartitionKey: {partition_key}, RowKey: {row_key} not found')
+            return create_error_response(
+                "Todo item not found",
                 status_code=404,
-                headers={'Content-Type': 'application/json'}
+                details=f"No todo found with the specified keys"
             )
     
     except Exception as e:
-        logging.error(f'Error deleting todo: {str(e)}')
-        return func.HttpResponse(
-            json.dumps({
-                "error": "An error occurred while deleting the todo",
-                "details": str(e)
-            }),
+        return create_error_response(
+            "Failed to delete todo",
             status_code=500,
-            headers={'Content-Type': 'application/json'}
+            details=str(e)
         )

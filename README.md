@@ -1,185 +1,221 @@
 # Serverless Todo Application
 
-A full-stack serverless todo application built with React frontend and Azure Functions Python backend, using Azure Table Storage for data persistence.
-
-## Architecture
-
-- **Frontend**: React 19.2.0 with responsive UI
-- **Backend**: Python Azure Functions (serverless API)
-- **Storage**: Azure Table Storage for persistent data
-- **Infrastructure**: Azure (IaC with Bicep/Terraform - coming soon)
-
-## Features
-
-✅ Add and remove todo items  
-✅ Display list of existing todos  
-✅ Persistent storage with Azure Table Storage  
-✅ RESTful API with error handling  
-✅ Responsive design  
-✅ CORS enabled for local development  
-
-## Project Structure
-
-```
-Ele_v1/
-├── src/                      # React frontend
-│   ├── TodoApp.jsx          # Main todo component
-│   ├── TodoApp.css          # Component styles
-│   ├── App.js               # Root component
-│   └── App.css              # App styles
-├── todo_api/                # Azure Functions backend
-│   ├── function_app.py      # API endpoints
-│   ├── requirements.txt     # Python dependencies
-│   ├── host.json            # Function host config
-│   ├── local.settings.json.example  # Config template
-│   └── README.md            # Backend documentation
-└── README.md                # This file
-```
+A full-stack serverless todo application built with React and Azure Functions (Python), using Azure Table Storage for data persistence.
 
 ## Prerequisites
 
-- Node.js 14+ and npm
-- Python 3.9+
-- Azure Functions Core Tools v4+
-- Azure CLI (for deployment)
-- Azure Storage Account
+- **Node.js** v14 or higher
+- **Python** 3.9 or higher
+- **Azure Functions Core Tools** v4.x
+- **Azure CLI** (for deployment)
+- **Azure Storage Account** (or Azurite for local development)
+
+Check your versions:
+```bash
+node --version
+python3 --version
+func --version
+az --version
+```
 
 ## Local Development Setup
 
 ### 1. Clone and Install Dependencies
 
 ```bash
+git clone https://github.com/jqzba/Ele_v1.git
+cd Ele_v1
+
 # Install frontend dependencies
 npm install
 
 # Install backend dependencies
 cd todo_api
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
 ### 2. Configure Azure Storage
 
-Create a storage account and get the connection string:
+Get your Azure Storage connection string:
 
 ```bash
-# Login to Azure
 az login
-
-# Get your storage account connection string
 az storage account show-connection-string \
   --name YOUR_STORAGE_ACCOUNT \
   --resource-group YOUR_RESOURCE_GROUP \
   --output tsv
 ```
 
-Copy `local.settings.json.example` to `local.settings.json` and add your connection string:
-
-```bash
-cd todo_api
-cp local.settings.json.example local.settings.json
-# Edit local.settings.json and add your AZURE_STORAGE_CONNECTION_STRING
+Create `todo_api/local.settings.json`:
+```json
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "AzureWebJobsFeatureFlags": "EnableWorkerIndexing",
+    "AZURE_STORAGE_CONNECTION_STRING": "YOUR_CONNECTION_STRING_HERE",
+    "TABLE_NAME": "todos"
+  }
+}
 ```
 
-See [todo_api/AZURE_STORAGE_SETUP.md](todo_api/AZURE_STORAGE_SETUP.md) for detailed storage setup instructions.
+**Note:** You can use Azurite for local development instead of Azure Storage:
+```bash
+npm install -g azurite
+azurite --silent --location ~/azurite
+# Set AZURE_STORAGE_CONNECTION_STRING="UseDevelopmentStorage=true"
+```
 
 ### 3. Run the Application
+
+Open two terminals:
 
 **Terminal 1 - Backend:**
 ```bash
 cd todo_api
+source .venv/bin/activate
 func start
 ```
-
-Backend will run on http://localhost:7071
+Backend runs on http://localhost:7071
 
 **Terminal 2 - Frontend:**
 ```bash
 npm start
 ```
+Frontend runs on http://localhost:3000
 
-Frontend will run on http://localhost:3000
+## Configuration
 
-## API Endpoints
+### API Endpoints
 
-- `GET /api/hello` - Test endpoint
-- `GET /api/health` - Health check
-- `GET /api/todo` - Get all todos
-- `POST /api/todo` - Create a new todo (requires `{ "title": "..." }`)
-- `DELETE /api/todo/{partitionKey}/{rowKey}` - Delete a todo
+The frontend connects to the backend API at `http://localhost:7071/api/todo`. 
 
-## Testing
+To change this, update `API_BASE_URL` in `src/TodoApp.jsx`:
+```javascript
+const API_BASE_URL = 'http://localhost:7071/api/todo';
+```
 
-Test the backend API:
+### Environment Variables
 
+**Backend** (`todo_api/local.settings.json`):
+- `AZURE_STORAGE_CONNECTION_STRING` - Azure Storage connection string
+- `TABLE_NAME` - Table name (default: "todos")
+
+**Important:** `local.settings.json` is git-ignored to protect your secrets.
+
+### CORS
+
+CORS is configured in `todo_api/host.json` to allow all origins for development. For production, restrict to your specific domain.
+
+## How to Deploy to Azure
+
+### Deploy Backend (Azure Functions)
+
+1. Create Azure resources:
+```bash
+# Create resource group
+az group create --name rg-todoapp --location eastus
+
+# Create storage account
+az storage account create \
+  --name todostorage$(date +%s) \
+  --resource-group rg-todoapp \
+  --location eastus \
+  --sku Standard_LRS
+
+# Create Function App
+az functionapp create \
+  --name todo-api-app \
+  --storage-account YOUR_STORAGE_ACCOUNT \
+  --resource-group rg-todoapp \
+  --consumption-plan-location eastus \
+  --runtime python \
+  --runtime-version 3.9 \
+  --functions-version 4
+```
+
+2. Configure app settings:
+```bash
+az functionapp config appsettings set \
+  --name todo-api-app \
+  --resource-group rg-todoapp \
+  --settings \
+    AZURE_STORAGE_CONNECTION_STRING="YOUR_CONNECTION_STRING" \
+    TABLE_NAME="todos"
+```
+
+3. Deploy the functions:
 ```bash
 cd todo_api
-./test_azure_storage.sh
+func azure functionapp publish todo-api-app
 ```
 
-## Data Schema
+### Deploy Frontend (Azure Static Web Apps)
 
-Todos are stored in Azure Table Storage with the following structure:
-
-```json
-{
-  "partitionKey": "default",
-  "rowKey": "1731491234567",
-  "id": "1731491234567",
-  "title": "Buy groceries",
-  "timestamp": "2025-11-13T10:00:00.000000Z"
-}
+1. Build the React app:
+```bash
+npm run build
 ```
 
-## Deployment
+2. Deploy to Azure Static Web Apps:
+```bash
+# Install SWA CLI
+npm install -g @azure/static-web-apps-cli
 
-> 🚧 Infrastructure as Code (Bicep/Terraform) and deployment instructions coming soon!
+# Deploy
+swa deploy ./build \
+  --app-name todo-frontend \
+  --resource-group rg-todoapp
+```
 
-## What's Implemented
+3. Update `src/TodoApp.jsx` with your deployed backend URL:
+```javascript
+const API_BASE_URL = 'https://todo-api-app.azurewebsites.net/api/todo';
+```
 
-✅ **Backend API** - Azure Functions with GET, POST, DELETE endpoints  
-✅ **Frontend UI** - React form and list display  
-✅ **Data Persistence** - Azure Table Storage integration  
-✅ **Error Handling** - 400, 404, 500 responses  
-⏳ **Infrastructure as Code** - Coming next  
-⏳ **Frontend-Backend Integration** - Coming next  
+**Note:** For automated infrastructure deployment using Bicep, see the [infra/](infra/) directory.
 
-## Next Steps
+## Known Limitations and Assumptions
 
-1. Connect React frontend to backend API
-2. Create Bicep/Terraform files for infrastructure
-3. Add Azure deployment configuration
-4. Deploy to Azure
+### Limitations
 
-## Learn More
+1. **No Authentication** - API endpoints are anonymous. Anyone with the URL can access the data.
 
-- [Azure Functions Python](https://learn.microsoft.com/azure/azure-functions/functions-reference-python)
-- [Azure Table Storage](https://learn.microsoft.com/azure/storage/tables/table-storage-overview)
-- [Create React App](https://facebook.github.io/create-react-app/docs/getting-started)
-- [React Documentation](https://reactjs.org/)
+2. **Single Partition** - All todos use `PartitionKey='default'`. This works for small-scale use but won't scale efficiently for large datasets.
 
+3. **No User Isolation** - All users see the same todos. There's no per-user data separation.
 
-### Code Splitting
+4. **No Pagination** - All todos are loaded at once. This could be slow with thousands of items.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+5. **No Edit Function** - You can only create and delete todos. Editing existing todos is not implemented.
 
-### Analyzing the Bundle Size
+6. **Client-side Validation Only** - Limited validation on title field. Should add length limits and content sanitization for production.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+7. **CORS Wildcard** - Development uses `allowedOrigins: ["*"]` which should be restricted in production.
 
-### Making a Progressive Web App
+### Assumptions
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+- **RowKey as Timestamp** - Using millisecond timestamp ensures uniqueness and provides chronological ordering
+- **Auto-refresh on Mutations** - After creating or deleting a todo, the entire list is re-fetched to ensure consistency
+- **Default Table Name** - Uses "todos" as the table name unless specified otherwise
+- **Local Development** - Assumes you have the necessary tools installed and an Azure subscription for deployment
 
-### Advanced Configuration
+## Troubleshooting
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+**Backend won't start - Module not found:**
+```bash
+cd todo_api
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 
-### Deployment
+**Frontend can't connect:**
+- Check backend is running at http://localhost:7071/api/health
+- Verify `API_BASE_URL` in `src/TodoApp.jsx`
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+**Storage connection failed:**
+- Verify `AZURE_STORAGE_CONNECTION_STRING` in `local.settings.json`
+- Or use Azurite for local development
