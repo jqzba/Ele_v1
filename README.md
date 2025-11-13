@@ -1,16 +1,18 @@
-# Serverless Todo Application
+# Todo App
 
-A full-stack serverless todo application built with React and Azure Functions (Python), using Azure Table Storage for data persistence.
+A simple full-stack todo application built with React and Azure Functions. Uses Azure Table Storage for persistence.
 
 ## Prerequisites
 
-- **Node.js** v14 or higher
-- **Python** 3.9 or higher
-- **Azure Functions Core Tools** v4.x
-- **Azure CLI** (for deployment)
-- **Azure Storage Account** (or Azurite for local development)
+You'll need these installed:
 
-Check your versions:
+- **Node.js** 14+ (I used v18.17.0)
+- **Python** 3.9+ (tested with 3.9.6)
+- **Azure Functions Core Tools** v4
+- **Azure CLI** (if you want to deploy)
+- An **Azure subscription** with a Storage Account
+
+Quick version check:
 ```bash
 node --version
 python3 --version
@@ -20,35 +22,38 @@ az --version
 
 ## Local Development Setup
 
-### 1. Clone and Install Dependencies
+### Getting Started
+
+Clone the repo and install dependencies:
 
 ```bash
 git clone https://github.com/jqzba/Ele_v1.git
 cd Ele_v1
 
-# Install frontend dependencies
+# Frontend
 npm install
 
-# Install backend dependencies
+# Backend
 cd todo_api
 python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Configure Azure Storage
+### Configure Azure Storage
 
-Get your Azure Storage connection string:
+You'll need a connection string from Azure Storage. Get it like this:
 
 ```bash
 az login
 az storage account show-connection-string \
-  --name YOUR_STORAGE_ACCOUNT \
+  --name YOUR_STORAGE_ACCOUNT_NAME \
   --resource-group YOUR_RESOURCE_GROUP \
   --output tsv
 ```
 
-Create `todo_api/local.settings.json`:
+Then create `todo_api/local.settings.json` (this file is gitignored):
+
 ```json
 {
   "IsEncrypted": false,
@@ -56,166 +61,135 @@ Create `todo_api/local.settings.json`:
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "FUNCTIONS_WORKER_RUNTIME": "python",
     "AzureWebJobsFeatureFlags": "EnableWorkerIndexing",
-    "AZURE_STORAGE_CONNECTION_STRING": "YOUR_CONNECTION_STRING_HERE",
+    "AZURE_STORAGE_CONNECTION_STRING": "your_connection_string_here",
     "TABLE_NAME": "todos"
   }
 }
 ```
 
-**Note:** You can use Azurite for local development instead of Azure Storage:
-```bash
-npm install -g azurite
-azurite --silent --location ~/azurite
-# Set AZURE_STORAGE_CONNECTION_STRING="UseDevelopmentStorage=true"
-```
+There's an example file (`local.settings.json.example`) you can copy.
 
-### 3. Run the Application
+### Run It
 
-Open two terminals:
+Open two terminal windows:
 
-**Terminal 1 - Backend:**
+**Backend (Terminal 1):**
 ```bash
 cd todo_api
 source .venv/bin/activate
 func start
 ```
-Backend runs on http://localhost:7071
 
-**Terminal 2 - Frontend:**
+The API runs at `http://localhost:7071`
+
+**Frontend (Terminal 2):**
 ```bash
 npm start
 ```
-Frontend runs on http://localhost:3000
 
-## Configuration
+The app opens at `http://localhost:3000`
 
-### API Endpoints
+## Deployment to Azure
 
-The frontend connects to the backend API at `http://localhost:7071/api/todo`. 
+I only tested this locally, but here's how you'd deploy it:
 
-To change this, update `API_BASE_URL` in `src/TodoApp.jsx`:
-```javascript
-const API_BASE_URL = 'http://localhost:7071/api/todo';
+### Using Bicep (Infrastructure as Code)
+
+There are Bicep templates in the `infra/` folder that set up the Azure Storage Account and Table Storage. To use them:
+
+```bash
+cd infra
+az deployment group create \
+  --resource-group YOUR_RESOURCE_GROUP \
+  --template-file main.bicep \
+  --parameters main.dev.bicepparam
 ```
 
-### Environment Variables
+This creates the storage resources you need.
 
-**Backend** (`todo_api/local.settings.json`):
-- `AZURE_STORAGE_CONNECTION_STRING` - Azure Storage connection string
-- `TABLE_NAME` - Table name (default: "todos")
+### Manual Deployment
 
-**Important:** `local.settings.json` is git-ignored to protect your secrets.
+If you prefer doing it manually:
 
-### CORS
+**1. Deploy the Backend:**
 
-CORS is configured in `todo_api/host.json` to allow all origins for development. For production, restrict to your specific domain.
-
-## How to Deploy to Azure
-
-### Deploy Backend (Azure Functions)
-
-1. Create Azure resources:
 ```bash
-# Create resource group
-az group create --name rg-todoapp --location eastus
-
-# Create storage account
-az storage account create \
-  --name todostorage$(date +%s) \
-  --resource-group rg-todoapp \
-  --location eastus \
-  --sku Standard_LRS
-
-# Create Function App
+# Create a Function App (you'll need a storage account first)
 az functionapp create \
-  --name todo-api-app \
+  --name YOUR_FUNCTION_APP_NAME \
   --storage-account YOUR_STORAGE_ACCOUNT \
-  --resource-group rg-todoapp \
+  --resource-group YOUR_RESOURCE_GROUP \
   --consumption-plan-location eastus \
   --runtime python \
   --runtime-version 3.9 \
   --functions-version 4
-```
 
-2. Configure app settings:
-```bash
+# Set the connection string
 az functionapp config appsettings set \
-  --name todo-api-app \
-  --resource-group rg-todoapp \
-  --settings \
-    AZURE_STORAGE_CONNECTION_STRING="YOUR_CONNECTION_STRING" \
-    TABLE_NAME="todos"
-```
-
-3. Deploy the functions:
-```bash
-cd todo_api
-func azure functionapp publish todo-api-app
-```
-
-### Deploy Frontend (Azure Static Web Apps)
-
-1. Build the React app:
-```bash
-npm run build
-```
-
-2. Deploy to Azure Static Web Apps:
-```bash
-# Install SWA CLI
-npm install -g @azure/static-web-apps-cli
+  --name YOUR_FUNCTION_APP_NAME \
+  --resource-group YOUR_RESOURCE_GROUP \
+  --settings AZURE_STORAGE_CONNECTION_STRING="your_connection_string"
 
 # Deploy
-swa deploy ./build \
-  --app-name todo-frontend \
-  --resource-group rg-todoapp
+cd todo_api
+func azure functionapp publish YOUR_FUNCTION_APP_NAME
 ```
 
-3. Update `src/TodoApp.jsx` with your deployed backend URL:
+**2. Deploy the Frontend:**
+
+Build and host the React app somewhere (Static Web Apps, Blob Storage with CDN, etc.):
+
+```bash
+npm run build
+# Then upload the build/ folder to your hosting service
+```
+
+Don't forget to update the API URL in `src/TodoApp.jsx` to point to your deployed backend.
+
+## Configuration
+
+### API Endpoint
+
+The frontend talks to the backend via the `API_BASE_URL` constant in `src/TodoApp.jsx`:
+
 ```javascript
-const API_BASE_URL = 'https://todo-api-app.azurewebsites.net/api/todo';
+const API_BASE_URL = 'http://localhost:7071/api/todo';
 ```
 
-**Note:** For automated infrastructure deployment using Bicep, see the [infra/](infra/) directory.
+Change this to your deployed Function App URL when you go to production.
+
+### Azure Connection String
+
+The backend needs `AZURE_STORAGE_CONNECTION_STRING` set in `todo_api/local.settings.json` locally, or in your Function App settings when deployed.
+
+### CORS
+
+CORS is set to allow all origins in `todo_api/host.json` for development. You should lock this down to your specific domain in production.
 
 ## Known Limitations and Assumptions
 
-### Limitations
+### What's Missing
 
-1. **No Authentication** - API endpoints are anonymous. Anyone with the URL can access the data.
+- **No authentication** - anyone with the URL can use the API. You'd want to add Azure AD or API keys for a real app.
+- **No edit functionality** - you can only add and delete todos, not update them.
+- **No user separation** - everyone sees the same todo list. All todos share one partition key ('default').
+- **No pagination** - if you had thousands of todos, this would get slow. Right now it loads everything at once.
+- **Basic validation** - just checks if the title exists. Should add length limits and sanitization.
 
-2. **Single Partition** - All todos use `PartitionKey='default'`. This works for small-scale use but won't scale efficiently for large datasets.
+### Assumptions I Made
 
-3. **No User Isolation** - All users see the same todos. There's no per-user data separation.
+- Using millisecond timestamps as RowKey seemed like a simple way to guarantee uniqueness and get chronological ordering for free.
+- CORS is wide open for development (`allowedOrigins: ["*"]`). This makes local testing easier but needs to be restricted for production.
+- The table name is hardcoded as "todos" unless you override it in settings.
+- After adding or deleting a todo, I refetch the whole list to keep things simple. More efficient would be to update the UI optimistically.
+- Tested everything locally with an actual Azure Storage Account (not Azurite), so I know it works with real Azure services.
 
-4. **No Pagination** - All todos are loaded at once. This could be slow with thousands of items.
+### If I Had More Time
 
-5. **No Edit Function** - You can only create and delete todos. Editing existing todos is not implemented.
-
-6. **Client-side Validation Only** - Limited validation on title field. Should add length limits and content sanitization for production.
-
-7. **CORS Wildcard** - Development uses `allowedOrigins: ["*"]` which should be restricted in production.
-
-### Assumptions
-
-- **RowKey as Timestamp** - Using millisecond timestamp ensures uniqueness and provides chronological ordering
-- **Auto-refresh on Mutations** - After creating or deleting a todo, the entire list is re-fetched to ensure consistency
-- **Default Table Name** - Uses "todos" as the table name unless specified otherwise
-- **Local Development** - Assumes you have the necessary tools installed and an Azure subscription for deployment
-
-## Troubleshooting
-
-**Backend won't start - Module not found:**
-```bash
-cd todo_api
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-**Frontend can't connect:**
-- Check backend is running at http://localhost:7071/api/health
-- Verify `API_BASE_URL` in `src/TodoApp.jsx`
-
-**Storage connection failed:**
-- Verify `AZURE_STORAGE_CONNECTION_STRING` in `local.settings.json`
-- Or use Azurite for local development
+I'd add:
+- User authentication and per-user todo lists
+- Edit/update functionality
+- Better error handling and loading states
+- Pagination or infinite scroll
+- Some tests
+- Proper environment configs for dev/staging/prod
