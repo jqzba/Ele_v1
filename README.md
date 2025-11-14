@@ -168,28 +168,18 @@ CORS is set to allow all origins in `todo_api/host.json` for development. You sh
 
 ## Known Limitations and Assumptions
 
-### What's Missing
+A short section in the README covering:
+• Which AI tools you used and how
+  - Perplexity Spaces for planning, Github Copilot for dev
+• Challenges you encountered and how you solved them
+  - Identifiend the issues in code manually and notified it to copilot, and it fixed them. Making videos of coding took way longer and made development very slow, also problems to upload those 
+• What you'd improve with more time
+  - User authentication and per-user todo lists
+  - Edit/update functionality
+  - Better error handling and loading states
+  - Pagination or infinite scroll
+  - Some tests
+• Any assumptions you made about requirements
 
-- **No authentication** - anyone with the URL can use the API. You'd want to add Azure AD or API keys for a real app.
-- **No edit functionality** - you can only add and delete todos, not update them.
-- **No user separation** - everyone sees the same todo list. All todos share one partition key ('default').
-- **No pagination** - if you had thousands of todos, this would get slow. Right now it loads everything at once.
-- **Basic validation** - just checks if the title exists. Should add length limits and sanitization.
 
-### Assumptions I Made
 
-- Using millisecond timestamps as RowKey seemed like a simple way to guarantee uniqueness and get chronological ordering for free.
-- CORS is wide open for development (`allowedOrigins: ["*"]`). This makes local testing easier but needs to be restricted for production.
-- The table name is hardcoded as "todos" unless you override it in settings.
-- After adding or deleting a todo, I refetch the whole list to keep things simple. More efficient would be to update the UI optimistically.
-- Tested everything locally with an actual Azure Storage Account (not Azurite), so I know it works with real Azure services.
-
-### If I Had More Time
-
-I'd add:
-- User authentication and per-user todo lists
-- Edit/update functionality
-- Better error handling and loading states
-- Pagination or infinite scroll
-- Some tests
-- Proper environment configs for dev/staging/prod
