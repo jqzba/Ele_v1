@@ -169,16 +169,21 @@ CORS is set to allow all origins in `todo_api/host.json` for development. You sh
 ## Known Limitations and Assumptions
 
 A short section in the README covering:
+
 • Which AI tools you used and how
   - Perplexity Spaces for planning, Github Copilot for dev
+
+    
 • Challenges you encountered and how you solved them
-  - Identifiend the issues in code manually and notified it to copilot, and it fixed them. Making videos of coding took way longer and made development very slow, also problems to upload those 
+  - Identifiend the issues in code manually and notified it to copilot, and it fixed them. Making videos of coding took way longer and made development very slow, also problems to upload those
+    
 • What you'd improve with more time
   - User authentication and per-user todo lists
   - Edit/update functionality
   - Better error handling and loading states
   - Pagination or infinite scroll
   - Some tests
+    
 • Any assumptions you made about requirements
 
 
